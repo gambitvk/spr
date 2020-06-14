@@ -2,10 +2,8 @@ import json
 from enum import Enum, auto
 from collections import defaultdict
 from itertools import combinations
-from getpass import getpass
 
-from .gesture_manager import GestureManager
-from .player import Human, Computer
+from .player import PlayerCreator
 
 
 class Result(Enum):
@@ -14,13 +12,38 @@ class Result(Enum):
     Lose = auto()
 
 
-class Judge():
+class RuleManager():
 
-    def __init__(self, gesture_manager):
-        self._ges_manager = gesture_manager
+    def __init__(self, config: dict):
+        self._gestures = []
+        self._lose_to = {}
+        self._import_config(config)
+
+    def _import_config(self, config: dict):
+        gestures = config.get('gestures')
+        if (gestures is None or len(gestures) == 0):
+            raise ValueError('No gestures found in config')
+        try:
+            for gesture in gestures:
+                self._register_gesture(gesture['name'], gesture['beats'])
+        except Exception as e:
+            raise ValueError(f"Malformed config file error: {e}")
+
+    def _register_gesture(self, gesture, lose_to):
+        self._gestures.append(gesture)
+        self._lose_to[gesture] = lose_to
+
+    def available_gestures(self):
+        return self._gestures
+
+    def rules_in_str(self):
+        result = []
+        for gesture, lose_to in self._lose_to.items():
+            result.append(f"{gesture} beats {lose_to}")
+        return "\n".join(result)
 
     def _validate_gesture(self, ges):
-        if ges not in self._ges_manager.available_gestures():
+        if ges not in self._gestures:
             raise ValueError(f"Invalid gestures {ges} ")
 
     def judge(self, ges1, ges2) -> Result:
@@ -30,7 +53,7 @@ class Judge():
         if ges1 == ges2:
             return Result.Draw
 
-        loser_list = self._ges_manager.lose_to(ges1)
+        loser_list = self._lose_to[ges1]
 
         return Result.Win if ges2 in loser_list else Result.Lose
 
@@ -40,16 +63,14 @@ class GameUI():
     output_str = {Result.Win: " beats ", Result.Draw: " draws with ",
                   Result.Lose: " lose to "}
 
-    def __init__(self, ges_manager):
-        self._ges_manager = ges_manager
-        gestures = ges_manager.available_gestures()
-        self._ges_dict = {i: gestures[i] for i in range(0, len(gestures))}
+    def __init__(self, name):
+        self._name = name
 
-    def print_intro(self, name, num_games):
-        print(f"{name} started, playing {num_games} rounds \n")
-        print(f"Available gestures {self._ges_manager.available_gestures()}\n")
+    def print_intro(self, num_games, rules, gestures):
+        print(f"{self._name} started, playing {num_games} rounds \n")
+        print(f"Available gestures {gestures}\n")
         print(f"Rules:")
-        print(f"{self._ges_manager.rules_in_str()}")
+        print(f"{rules}")
 
     def print_result(self, player1, player2, choices, result):
         print(f"{player1} ({choices[player1]}) {self.output_str[result]}"
@@ -67,33 +88,17 @@ class GameUI():
         print("----------------\n")
         print(f"Round {round}")
 
-    def get_user_choice(self, name) -> int:
-        while(1):
-            input_str = getpass(f"{name} enter integer of gesture"
-                                f" {self._ges_dict}"
-                                f" (choice will not be displayed)\n")
-            index = None
-            try:
-                index = int(input_str)
-                if index < 0 or index >= len(self._ges_dict):
-                    raise ValueError("Selection not in range")
-                return self._ges_dict[index]
-            except ValueError:
-                print(f"Invalid selection\n")
-
 
 class Game():
 
-    def __init__(self, name, num_games, judge, ges_manager, game_ui,
-                 player_list):
-        self._name = name
+    def __init__(self, num_games, rule_manager, game_ui, player_list):
         self._num_games = num_games
-        self._judge = judge
-        self._ges_manager = ges_manager
+        self._rule_manager = rule_manager
         self._ui = game_ui
         self._players = player_list
         player_names = [x.name for x in self._players]
         self._player_score = defaultdict(int).fromkeys(player_names, 0)
+        self._judge_list = [(x, y) for x, y in combinations(player_names, 2)]
 
     def _update_score(self, player1, player2, result):
         if result == Result.Win:
@@ -102,25 +107,24 @@ class Game():
             self._player_score[player2] += 1
 
     def run(self):
-        self._ui.print_intro(self._name, self._num_games)
+        self._ui.print_intro(self._num_games,
+                             self._rule_manager.rules_in_str(),
+                             self._rule_manager.available_gestures())
 
         for cur in range(self._num_games):
             self._ui.print_start_round(cur+1)
 
-            choices = {}
-            for player in self._players:
-                choices[player.name] = player.get_choice()
+            choices = {p.name: p.get_choice() for p in self._players}
 
-            judge_list = combinations(choices.keys(), 2)
-
-            for player1, player2 in judge_list:
-                result = self._judge.judge(choices[player1], choices[player2])
+            for player1, player2 in self._judge_list:
+                result = self._rule_manager.judge(choices[player1],
+                                                  choices[player2])
                 self._ui.print_result(player1, player2, choices, result)
                 self._update_score(player1, player2, result)
         self._ui.print_final(self._player_score)
 
 
-class GameManager():
+class GameCreator():
 
     DEFAULT_NAME = 'SPR Default'
     DEFAULT_ROUNDS = 5
@@ -129,50 +133,16 @@ class GameManager():
         with open(config) as fp:
             self._config = json.load(fp)
 
-    def _create_gesture_manager(self):
-        gesture_manager = GestureManager()
-        gestures = self._config.get('gestures')
-        if (gestures is None or len(gestures) == 0):
-            raise ValueError('No gestures found in config')
-
-        try:
-            for gesture in gestures:
-                gesture_manager.register_gesture(gesture['name'],
-                                                 gesture['beats'])
-        except Exception as e:
-            raise ValueError(f"Malformed config file error: {e}")
-
-        return gesture_manager
-
-    def _create_players(self, gesture, ui):
-        players = self._config.get('players')
-        if (players is None or len(players) < 2):
-            raise ValueError('Must define at least 2 players in config')
-        player_list = []
-        try:
-            for player in players:
-                if player['type'] == 'Human':
-                    player_list.append(Human(player['name'], gesture, ui))
-                elif player['type'] == 'Computer':
-                    player_list.append(Computer(player['name'], gesture))
-                else:
-                    raise ValueError(f'Unknown player type {player["type"]}')
-        except Exception as e:
-            raise ValueError(f"Malformed config file error: {e}")
-
-        return player_list
-
     def create_game(self):
-        gesture_manager = self._create_gesture_manager()
-        judge = Judge(gesture_manager)
-        ui = GameUI(gesture_manager)
-        players = self._create_players(gesture_manager, ui)
+        rule_manager = RuleManager(self._config)
 
         game_name = self._config.get('name', self.DEFAULT_NAME)
+        ui = GameUI(game_name)
+
+        player_creator = PlayerCreator()
+        players = player_creator.create(self._config,
+                                        rule_manager.available_gestures())
         num_of_rounds = self._config.get('number_of_rounds',
                                          self.DEFAULT_ROUNDS)
 
-        if num_of_rounds is None:
-            num_of_rounds = 5
-        return Game(game_name, num_of_rounds, judge, gesture_manager, ui,
-                    players)
+        return Game(num_of_rounds, rule_manager, ui, players)

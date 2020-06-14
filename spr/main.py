@@ -1,5 +1,5 @@
 import argparse
-from .game import GameManager
+from .game import GameCreator
 
 
 if __name__ == "__main__":
@@ -7,6 +7,6 @@ if __name__ == "__main__":
     parser.add_argument('config_file', type=str, help="path to json config")
     args = parser.parse_args()
 
-    game_manager = GameManager(args.config_file)
-    spr = game_manager.create_game()
+    game_creator = GameCreator(args.config_file)
+    spr = game_creator.create_game()
     spr.run()

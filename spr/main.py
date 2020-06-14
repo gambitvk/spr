@@ -1,5 +1,5 @@
 import argparse
-from .game_manager import GameManager
+from .game import GameManager
 
 
 if __name__ == "__main__":

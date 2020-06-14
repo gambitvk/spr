@@ -2,6 +2,7 @@ import json
 from enum import Enum, auto
 from collections import defaultdict
 from itertools import combinations
+from typing import Dict, List
 
 from .player import PlayerCreator
 
@@ -29,24 +30,24 @@ class RuleManager():
         except Exception as e:
             raise ValueError(f"Malformed config file error: {e}")
 
-    def _register_gesture(self, gesture, lose_to):
+    def _register_gesture(self, gesture: str, lose_to: List[str]):
         self._gestures.append(gesture)
         self._lose_to[gesture] = lose_to
 
-    def available_gestures(self):
+    def available_gestures(self) -> List[str]:
         return self._gestures
 
-    def rules_in_str(self):
+    def rules_in_str(self) -> str:
         result = []
         for gesture, lose_to in self._lose_to.items():
             result.append(f"{gesture} beats {lose_to}")
         return "\n".join(result)
 
-    def _validate_gesture(self, ges):
+    def _validate_gesture(self, ges: str):
         if ges not in self._gestures:
             raise ValueError(f"Invalid gestures {ges} ")
 
-    def judge(self, ges1, ges2) -> Result:
+    def judge(self, ges1: str, ges2: str) -> Result:
         self._validate_gesture(ges1)
         self._validate_gesture(ges2)
 
@@ -63,28 +64,29 @@ class GameUI():
     output_str = {Result.Win: " beats ", Result.Draw: " draws with ",
                   Result.Lose: " lose to "}
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         self._name = name
 
-    def print_intro(self, num_games, rules, gestures):
+    def print_intro(self, num_games: int, rules: str, gestures: List[str]):
         print(f"{self._name} started, playing {num_games} rounds \n")
         print(f"Available gestures {gestures}\n")
         print(f"Rules:")
         print(f"{rules}")
 
-    def print_result(self, player1, player2, choices, result):
+    def print_result(self, player1: str, player2: str, choices: Dict[str, str],
+                     result: Result):
         print(f"{player1} ({choices[player1]}) {self.output_str[result]}"
               f"{player2} ({choices[player2]})")
 
     @staticmethod
-    def print_final(player_score):
+    def print_final(player_score: Dict[str, int]):
         print("----------------\n")
         for player, score in player_score.items():
             print(f"{player} scored {score} ")
         print("\nGame Ended!!")
 
     @staticmethod
-    def print_start_round(round):
+    def print_start_round(round: int):
         print("----------------\n")
         print(f"Round {round}")
 
@@ -129,19 +131,20 @@ class GameCreator():
     DEFAULT_NAME = 'SPR Default'
     DEFAULT_ROUNDS = 5
 
-    def __init__(self, config):
+    def __init__(self, config: str):
         with open(config) as fp:
             self._config = json.load(fp)
 
     def create_game(self):
-        rule_manager = RuleManager(self._config)
-
         game_name = self._config.get('name', self.DEFAULT_NAME)
         ui = GameUI(game_name)
+
+        rule_manager = RuleManager(self._config)
 
         player_creator = PlayerCreator()
         players = player_creator.create(self._config,
                                         rule_manager.available_gestures())
+
         num_of_rounds = self._config.get('number_of_rounds',
                                          self.DEFAULT_ROUNDS)
 

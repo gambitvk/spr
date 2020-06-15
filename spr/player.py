@@ -1,29 +1,30 @@
 from abc import ABC, abstractmethod
 from getpass import getpass
 import random
+from typing import List
 
 
 class Player(ABC):
 
-    def __init__(self, name, gestures):
+    def __init__(self, name: str, gestures: List[str]) -> None:
         self._name = name
         self._gestures = gestures
         super().__init__()
 
     @property
-    def name(self):
+    def name(self) -> None:
         return self._name
 
     @abstractmethod
-    def get_choice(self):
+    def get_choice(self) -> str:
         pass
 
 
 class Human(Player):
 
-    def __init__(self, name, gestures):
+    def __init__(self, name: str, gestures: List[str]) -> None:
         super().__init__(name, gestures)
-        self._ges_dict = {i: gestures[i] for i in range(0, len(gestures))}
+        self._ges_dict = {index: elem for index, elem in enumerate(gestures)}
 
     def get_choice(self) -> int:
         while(1):
@@ -42,29 +43,30 @@ class Human(Player):
 
 class Computer(Player):
 
-    def get_choice(self):
+    def get_choice(self) -> str:
         return random.choice(self._gestures)
 
 
 class PlayerCreator():
 
-    def __init__(self):
-        self._creators = {'Human': Human, 'Computer': Computer}
+    _creators = {'Human': Human, 'Computer': Computer}
 
-    def _create(self, player, gestures):
+    @classmethod
+    def _create(cls, player, **kwargs):
         key = player['type']
-        creator = self._creators.get(key)
+        creator = cls._creators.get(key)
         if not creator:
             raise ValueError(f"Unknown Player type {key}")
 
-        return creator(player['name'], gestures)
+        return creator(player['name'], **kwargs)
 
-    def create(self, config: dict, gestures: list) -> list:
+    @classmethod
+    def create(cls, config: dict, **kwargs) -> list:
         players = config.get('players')
         if (not players or len(players) < 2):
             raise ValueError('Must define at least 2 players in config')
 
         try:
-            return [self._create(player, gestures) for player in players]
+            return [cls._create(player, **kwargs) for player in players]
         except Exception as e:
             raise ValueError(f"Malformed config file error: {e}")

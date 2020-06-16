@@ -8,5 +8,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     game_creator = GameCreator(args.config_file)
-    spr = game_creator.create_game()
-    spr.run()
+    game_obj = game_creator.create_game()
+    game_obj.run()

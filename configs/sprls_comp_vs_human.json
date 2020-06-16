@@ -1,0 +1,51 @@
+{
+  "name": "SPR_STANDARD",
+  "number_of_rounds": 5,
+  "gestures": [
+    {
+      "name": "Rock",
+      "beats":[
+        "Scissor", 
+        "Lizard"
+      ]
+    },
+    {
+      "name": "Scissor",
+      "beats":[
+        "Paper", 
+        "Lizard"
+      ]
+    },
+    {
+      "name": "Paper",
+      "beats":[
+        "Rock", 
+        "Spock"
+      ]
+    },
+    {
+      "name": "Lizard",
+      "beats":[
+        "Paper", 
+        "Spock"
+      ]
+    },
+    {
+      "name": "Spock",
+      "beats":[
+        "Rock",
+        "Scissor"
+      ]
+    }
+  ],
+  "players": [
+    {
+      "type": "Human",
+      "name": "Player 1"
+    },
+    {
+      "type": "Computer",
+      "name": "Comp 1"
+    }
+  ]
+}

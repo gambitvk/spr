@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from io import StringIO
 
 
@@ -10,15 +10,15 @@ class TestPlayer(TestCase):
 
     def setUp(self):
         self.gestures = ['Rock', 'Scissor', 'Paper']
-        self.human = Human('human', self.gestures)
+        self.get_user_fn = Mock()
+        self.human = Human('human', self.gestures, self.get_user_fn)
         self.computer = Computer('computer', self.gestures)
 
     @patch('sys.stdout', new_callable=StringIO)
-    @patch('spr.player.getpass')
-    def test_human_get_choice_invalid(self, mock_getpass, mock_stdout):
+    def test_human_get_choice_invalid(self, mock_stdout):
         invalid_index = 10
         valid_index = 1
-        mock_getpass.side_effect = [invalid_index, valid_index]
+        self.get_user_fn.side_effect = [invalid_index, valid_index]
         expected_stdout = 'Invalid selection'
         expected_result = self.gestures[valid_index]
 
@@ -27,10 +27,9 @@ class TestPlayer(TestCase):
         self.assertEqual(mock_stdout.getvalue().strip(), expected_stdout)
         self.assertEqual(expected_result, result)
 
-    @patch('spr.player.getpass')
-    def test_human_get_choice_valid(self, mock_getpass, ):
+    def test_human_get_choice_valid(self):
         index = 2
-        mock_getpass.side_effect = [index]
+        self.get_user_fn.side_effect = [index]
         expected = self.gestures[index]
 
         result = self.human.get_choice()
